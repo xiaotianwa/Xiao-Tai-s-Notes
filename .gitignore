@@ -16,6 +16,9 @@ coverage/
 *.md
 !/README.md
 
+# Archived experiments are kept local only.
+归档_V1后续数据库方案/drift_experimental/
+
 # Local operation scripts are kept off GitHub.
 **/scripts/
 **/deploy/
