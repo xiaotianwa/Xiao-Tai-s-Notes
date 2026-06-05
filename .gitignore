@@ -12,6 +12,19 @@ coverage/
 *.log
 *.tmp
 
+# Keep only the repository README in GitHub.
+*.md
+!/README.md
+
+# Local operation scripts are kept off GitHub.
+**/scripts/
+**/deploy/
+xiaotai_server/backend/add-announcements-table.js
+*.ps1
+*.sh
+*.bat
+*.cmd
+
 # Local runtime data can include private notes, sync state, and auth tokens.
 xiaotai_life/device_data*.json
 xiaotai_life/*.local.json
