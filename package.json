@@ -1,0 +1,12 @@
+{
+  "name": "xiaotairiji",
+  "version": "1.0.0",
+  "description": "婷婷的小笨笔记是一款只服务于两个人的私有生活记录 App：你和女朋友。它不是公开社交产品，也不追求获客、广告、商业化和陌生人协作，核心目标是把两个人的日常、纪念、提醒、照片和想法稳稳保存下来，并在需要时同步到私有服务端。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

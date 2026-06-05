@@ -1,0 +1,26 @@
+.codex/
+.idea/
+.playwright-mcp/
+.vscode/
+.windsurf/
+
+node_modules/
+dist/
+build/
+coverage/
+
+*.log
+*.tmp
+
+# Local runtime data can include private notes, sync state, and auth tokens.
+xiaotai_life/device_data*.json
+xiaotai_life/*.local.json
+xiaotai_server/backend/data/*.db
+xiaotai_server/backend/data/*.db-*
+xiaotai_server/backend/data/*.bak
+
+# TypeScript incremental build cache.
+*.tsbuildinfo
+
+# Visual check artifacts.
+*_check*.png
