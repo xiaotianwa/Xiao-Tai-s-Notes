@@ -61,6 +61,71 @@ export interface AdminAuditLog {
   actor: AdminUser;
 }
 
+export interface AdminSyncTypeStat {
+  type: string;
+  activeCount: number;
+  deletedCount: number;
+  latestServerUpdatedAt: string | null;
+}
+
+export interface AdminUserDetail extends AdminUser {
+  devices: AdminDevice[];
+  syncItemCount: number;
+  deletedSyncItemCount: number;
+  mediaAssetCount: number;
+  latestSyncAt: string | null;
+  latestMediaUploadedAt: string | null;
+  syncTypeStats: AdminSyncTypeStat[];
+  latestItems: AdminSyncItem[];
+  recentDeletedItems: AdminSyncItem[];
+  recentAuditLogs: AdminAuditLog[];
+}
+
+export type SyncHealthStatus =
+  | "healthy"
+  | "warning"
+  | "critical"
+  | "no_data"
+  | "disabled";
+
+export interface AdminSyncHealthUser {
+  user: AdminUser;
+  status: SyncHealthStatus;
+  statusLabel: string;
+  statusReason: string;
+  deviceCount: number;
+  syncItemCount: number;
+  activeSyncItemCount: number;
+  deletedSyncItemCount: number;
+  todaySyncCount: number;
+  mediaAssetCount: number;
+  latestSyncAt: string | null;
+  latestDeviceSeenAt: string | null;
+  latestActivityAt: string | null;
+  latestMediaUploadedAt: string | null;
+  latestDevice: AdminDevice | null;
+}
+
+export interface AdminSyncHealthSummary {
+  totalUsers: number;
+  activeUsers: number;
+  healthyUsers: number;
+  warningUsers: number;
+  criticalUsers: number;
+  noDataUsers: number;
+  disabledUsers: number;
+  totalDevices: number;
+  totalSyncItems: number;
+  deletedSyncItems: number;
+  todaySyncCount: number;
+  latestActivityAt: string | null;
+}
+
+export interface AdminSyncHealthData
+  extends PageResult<AdminSyncHealthUser> {
+  summary: AdminSyncHealthSummary;
+}
+
 export interface DashboardData {
   userCount: number;
   syncItemCount: number;

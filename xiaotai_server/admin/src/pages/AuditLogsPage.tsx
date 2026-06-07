@@ -4,6 +4,7 @@ import {
   DownloadOutlined,
   EyeOutlined,
   ReloadOutlined,
+  RollbackOutlined,
   SearchOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -70,6 +71,11 @@ function getActionInfo(action: string): ActionInfo {
       label: "删除数据",
       color: "red",
       icon: <DeleteOutlined />,
+    },
+    "admin.items.restore": {
+      label: "恢复数据",
+      color: "green",
+      icon: <RollbackOutlined />,
     },
 
     // 媒体相关

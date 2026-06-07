@@ -2,6 +2,7 @@ import {
   DatabaseOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  RollbackOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
 import {
@@ -20,13 +21,15 @@ import {
 } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import PageHeader from '../components/PageHeader';
 
-import { deleteSyncItem, getItemDetail, getItems } from '../api/admin';
+import { deleteSyncItem, getItemDetail, getItems, restoreSyncItem } from '../api/admin';
 import { ApiError } from '../api/client';
 import type { AdminSyncItem } from '../api/types';
 import { formatDateTime, typeLabel } from '../utils/format';
+import { showSuccessToast } from '../utils/operationToast';
 
 const typeOptions = [
   'entry',
@@ -53,15 +56,22 @@ interface BusinessSummary {
 }
 
 export default function DataPage(): React.JSX.Element {
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<AdminSyncItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [keyword, setKeyword] = useState('');
-  const [type, setType] = useState<string | undefined>();
-  const [deleted, setDeleted] = useState<string | undefined>('false');
+  const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
+  const [type, setType] = useState<string | undefined>(
+    searchParams.get('type') ?? undefined,
+  );
+  const [deleted, setDeleted] = useState<string | undefined>(
+    searchParams.get('deleted') ?? 'false',
+  );
+  const [userId, setUserId] = useState(searchParams.get('userId') ?? '');
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminSyncItem | null>(null);
 
@@ -74,6 +84,7 @@ export default function DataPage(): React.JSX.Element {
         pageSize: nextPageSize,
         keyword,
         type,
+        userId,
         deleted,
       });
       setItems(result.items);
@@ -115,6 +126,26 @@ export default function DataPage(): React.JSX.Element {
       );
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function restoreItem(row: AdminSyncItem): Promise<void> {
+    setRestoringId(row.id);
+    setError(null);
+    try {
+      const result = await restoreSyncItem(row.id);
+      showSuccessToast(`${buildBusinessSummary(result.item).title} 已恢复`);
+      setItems((current) =>
+        current.map((item) => (item.id === row.id ? result.item : item)),
+      );
+      setDetail((current) => (current?.id === row.id ? result.item : current));
+      await load(page, pageSize);
+    } catch (requestError) {
+      setError(
+        requestError instanceof ApiError ? requestError.message : '恢复失败',
+      );
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -183,6 +214,23 @@ export default function DataPage(): React.JSX.Element {
           <Button type="link" onClick={() => void openDetail(row.id)}>
             详情
           </Button>
+          {row.deletedAt && (
+            <Popconfirm
+              title="恢复这条 APP 数据？"
+              description="恢复后会同步回 APP，客户端下次同步时会重新获得这条记录。"
+              okText="恢复"
+              cancelText="取消"
+              onConfirm={() => void restoreItem(row)}
+            >
+              <Button
+                type="link"
+                icon={<RollbackOutlined />}
+                loading={restoringId === row.id}
+              >
+                恢复
+              </Button>
+            </Popconfirm>
+          )}
           <Popconfirm
             title="确认删除这条 APP 数据？"
             description="删除后会同步到 APP，本地对应内容将在下次同步时移除。"
@@ -233,6 +281,13 @@ export default function DataPage(): React.JSX.Element {
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
             onSearch={() => void load(1, pageSize)}
+          />
+          <Input
+            allowClear
+            placeholder="按用户 ID 筛选"
+            style={{ width: 240 }}
+            value={userId}
+            onChange={(event) => setUserId(event.target.value)}
           />
           <Select
             allowClear

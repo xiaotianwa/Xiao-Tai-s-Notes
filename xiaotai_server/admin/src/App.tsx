@@ -13,6 +13,7 @@ const AppVersionsPage = lazy(() => import("./pages/AppVersionsPage"));
 const AiVerifyPage = lazy(() => import("./pages/AiVerifyPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const DataPage = lazy(() => import("./pages/DataPage"));
+const DataRecoveryPage = lazy(() => import("./pages/DataRecoveryPage"));
 const DailyComicsPage = lazy(() => import("./pages/DailyComicsPage"));
 const EntriesPage = lazy(() => import("./pages/EntriesPage"));
 const ForcePushPage = lazy(() => import("./pages/ForcePushPage"));
@@ -20,6 +21,7 @@ const MediaPage = lazy(() => import("./pages/MediaPage"));
 const MemosPage = lazy(() => import("./pages/MemosPage"));
 const MusicPage = lazy(() => import("./pages/MusicPage"));
 const PlacesPage = lazy(() => import("./pages/PlacesPage"));
+const SyncHealthPage = lazy(() => import("./pages/SyncHealthPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
 
 function RequireAuth(): React.JSX.Element {
@@ -52,7 +54,15 @@ export default function App(): React.JSX.Element {
           <Route element={<RequireAuth />}>
             <Route path="/" element={withSuspense(<DashboardPage />)} />
             <Route path="/users" element={withSuspense(<UsersPage />)} />
+            <Route
+              path="/sync-health"
+              element={withSuspense(<SyncHealthPage />)}
+            />
             <Route path="/data" element={withSuspense(<DataPage />)} />
+            <Route
+              path="/recovery"
+              element={withSuspense(<DataRecoveryPage />)}
+            />
             <Route path="/entries" element={withSuspense(<EntriesPage />)} />
             <Route path="/memos" element={withSuspense(<MemosPage />)} />
             <Route

@@ -43,6 +43,12 @@ export class AdminController {
     return this.adminService.dashboard();
   }
 
+  @Get("sync-health")
+  @ApiOperation({ summary: "管理端同步健康中心" })
+  syncHealth(@Query() query: AdminUsersQueryDto) {
+    return this.adminService.syncHealth(query);
+  }
+
   @Get("users")
   @ApiOperation({ summary: "管理端用户列表" })
   users(@Query() query: AdminUsersQueryDto) {
@@ -111,6 +117,12 @@ export class AdminController {
   @Delete("items/:id")
   removeItem(@Param("id") id: string, @Req() request: AuthenticatedRequest) {
     return this.adminService.softDeleteItem(id, request.user, request);
+  }
+
+  @Patch("items/:id/restore")
+  @ApiOperation({ summary: "管理端恢复已删除同步数据" })
+  restoreItem(@Param("id") id: string, @Req() request: AuthenticatedRequest) {
+    return this.adminService.restoreSyncItem(id, request.user, request);
   }
 
   @Get("audit-logs")

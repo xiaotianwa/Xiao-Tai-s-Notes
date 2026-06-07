@@ -13,6 +13,8 @@ import {
   FileTextOutlined,
   LogoutOutlined,
   PictureOutlined,
+  RollbackOutlined,
+  SyncOutlined,
   TeamOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
@@ -59,9 +61,21 @@ const navItems = [
   },
   {
     section: "系统",
+    key: "/sync-health",
+    icon: <SyncOutlined />,
+    label: "同步健康",
+  },
+  {
+    section: "系统",
     key: "/data",
     icon: <DatabaseOutlined />,
     label: "APP 数据(全部)",
+  },
+  {
+    section: "系统",
+    key: "/recovery",
+    icon: <RollbackOutlined />,
+    label: "数据恢复",
   },
   {
     section: "系统",

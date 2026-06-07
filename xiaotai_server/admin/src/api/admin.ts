@@ -8,8 +8,10 @@ import type {
   AdminMediaAsset,
   AdminMediaDownloadTicket,
   AdminMusicTrack,
+  AdminSyncHealthData,
   AdminSyncItem,
   AdminUser,
+  AdminUserDetail,
   AppVersion,
   AuthTokens,
   DashboardData,
@@ -150,6 +152,14 @@ export function getDashboard(): Promise<DashboardData> {
   return requestApi<DashboardData>("/admin/dashboard");
 }
 
+export function getSyncHealth(
+  query: UserQuery,
+): Promise<AdminSyncHealthData> {
+  return requestApi<AdminSyncHealthData>(
+    `/admin/sync-health?${toQuery(query)}`,
+  );
+}
+
 export function verifyAiModel(message: string): Promise<AiChatResult> {
   return requestApi<AiChatResult>("/ai/chat", {
     method: "POST",
@@ -163,8 +173,17 @@ export function getUsers(query: UserQuery): Promise<PageResult<AdminUser>> {
 
 export function getUserDetail(
   id: string,
-): Promise<AdminUser & { devices: AdminDevice[]; syncItemCount: number }> {
+): Promise<AdminUserDetail> {
   return requestApi(`/admin/users/${encodeURIComponent(id)}`);
+}
+
+export function getUserItems(
+  id: string,
+  query: Omit<ItemQuery, "userId">,
+): Promise<PageResult<AdminSyncItem>> {
+  return requestApi<PageResult<AdminSyncItem>>(
+    `/admin/users/${encodeURIComponent(id)}/items?${toQuery(query)}`,
+  );
 }
 
 export function createAdminUser(
@@ -242,6 +261,15 @@ export function deleteSyncItem(
   return requestApi<{ deleted: true; item: AdminSyncItem }>(
     `/admin/items/${encodeURIComponent(id)}`,
     { method: "DELETE" },
+  );
+}
+
+export function restoreSyncItem(
+  id: string,
+): Promise<{ restored: true; item: AdminSyncItem }> {
+  return requestApi<{ restored: true; item: AdminSyncItem }>(
+    `/admin/items/${encodeURIComponent(id)}/restore`,
+    { method: "PATCH" },
   );
 }
 

@@ -1,7 +1,12 @@
 import {
+  DatabaseOutlined,
   DeleteOutlined,
+  HistoryOutlined,
+  MobileOutlined,
+  PictureOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RollbackOutlined,
   SearchOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
@@ -18,10 +23,12 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
 } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import PageHeader from "../components/PageHeader";
 
@@ -34,9 +41,16 @@ import {
   updateAdminUserStatus,
 } from "../api/admin";
 import { ApiError } from "../api/client";
-import type { AdminDevice, AdminUser } from "../api/types";
-import { formatDateTime } from "../utils/format";
+import type {
+  AdminAuditLog,
+  AdminDevice,
+  AdminSyncItem,
+  AdminUser,
+  AdminUserDetail,
+} from "../api/types";
+import { formatCount, formatDateTime, typeLabel } from "../utils/format";
 import { showSuccessToast } from "../utils/operationToast";
+import { buildSyncItemSummary } from "../utils/syncItemSummary";
 
 interface CreateUserValues {
   username: string;
@@ -69,6 +83,8 @@ function statusLabel(value: string): string {
 }
 
 export default function UsersPage(): React.JSX.Element {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -80,9 +96,7 @@ export default function UsersPage(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [resetUser, setResetUser] = useState<AdminUser | null>(null);
-  const [detail, setDetail] = useState<
-    (AdminUser & { devices: AdminDevice[]; syncItemCount: number }) | null
-  >(null);
+  const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [createForm] = Form.useForm<CreateUserValues>();
   const [resetForm] = Form.useForm<ResetPasswordValues>();
 
@@ -120,6 +134,15 @@ export default function UsersPage(): React.JSX.Element {
           ? requestError.message
           : "详情加载失败",
       );
+    }
+  }
+
+  function closeDetail(): void {
+    setDetail(null);
+    if (searchParams.has("detail")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("detail");
+      setSearchParams(next);
     }
   }
 
@@ -213,6 +236,13 @@ export default function UsersPage(): React.JSX.Element {
     void load(1, pageSize);
   }, []);
 
+  useEffect(() => {
+    const detailId = searchParams.get("detail");
+    if (detailId && detail?.id !== detailId) {
+      void openDetail(detailId);
+    }
+  }, [searchParams]);
+
   const columns: ColumnsType<AdminUser> = [
     { title: "昵称", dataIndex: "nickname", width: 150, ellipsis: true },
     { title: "账号", dataIndex: "username", width: 150, ellipsis: true },
@@ -252,7 +282,13 @@ export default function UsersPage(): React.JSX.Element {
         const nextText = row.status === "active" ? "停用" : "启用";
         return (
           <Space size={4}>
-            <Button type="link" onClick={() => void openDetail(row.id)}>
+            <Button
+              type="link"
+              onClick={() => {
+                setSearchParams({ detail: row.id });
+                void openDetail(row.id);
+              }}
+            >
               查看
             </Button>
             <Button
@@ -388,37 +424,19 @@ export default function UsersPage(): React.JSX.Element {
         />
       </Card>
       <Modal
-        title="用户详情"
+        title={detail ? `${detail.nickname} 的用户 360` : "用户 360"}
         open={Boolean(detail)}
-        onCancel={() => setDetail(null)}
+        onCancel={closeDetail}
         footer={null}
-        width={820}
+        width={980}
         className="detail-modal"
       >
         {detail && (
-          <Descriptions column={1} bordered size="middle">
-            <Descriptions.Item label="昵称">
-              {detail.nickname}
-            </Descriptions.Item>
-            <Descriptions.Item label="账号">
-              {detail.username}
-            </Descriptions.Item>
-            <Descriptions.Item label="角色">
-              {roleLabel(detail.role)}
-            </Descriptions.Item>
-            <Descriptions.Item label="状态">
-              {statusLabel(detail.status)}
-            </Descriptions.Item>
-            <Descriptions.Item label="同步数据">
-              {detail.syncItemCount}
-            </Descriptions.Item>
-            <Descriptions.Item label="设备数量">
-              {detail.devices.length}
-            </Descriptions.Item>
-            <Descriptions.Item label="创建时间">
-              {formatDateTime(detail.createdAt)}
-            </Descriptions.Item>
-          </Descriptions>
+          <UserDetail360
+            detail={detail}
+            onOpenData={() => navigate(`/data?userId=${detail.id}`)}
+            onOpenRecovery={() => navigate(`/recovery?userId=${detail.id}`)}
+          />
         )}
       </Modal>
       <Modal
@@ -519,4 +537,298 @@ export default function UsersPage(): React.JSX.Element {
       </Modal>
     </>
   );
+}
+
+function UserDetail360({
+  detail,
+  onOpenData,
+  onOpenRecovery,
+}: {
+  detail: AdminUserDetail;
+  onOpenData: () => void;
+  onOpenRecovery: () => void;
+}): React.JSX.Element {
+  const deviceColumns: ColumnsType<AdminDevice> = [
+    { title: "设备", dataIndex: "deviceName", ellipsis: true },
+    { title: "平台", dataIndex: "platform", width: 110 },
+    {
+      title: "版本",
+      width: 130,
+      render: (_, row) =>
+        row.appVersionName
+          ? `${row.appVersionName}${row.appVersionCode ? `(${row.appVersionCode})` : ""}`
+          : "-",
+    },
+    {
+      title: "最近同步",
+      dataIndex: "lastSeenAt",
+      width: 180,
+      className: "table-date",
+      render: (value: string | null) => formatDateTime(value),
+    },
+  ];
+  const itemColumns: ColumnsType<AdminSyncItem> = [
+    {
+      title: "类型",
+      dataIndex: "type",
+      width: 110,
+      render: (value: string) => <Tag color="blue">{typeLabel(value)}</Tag>,
+    },
+    {
+      title: "业务内容",
+      render: (_, row) => <SyncItemSummaryCell item={row} />,
+    },
+    {
+      title: "状态",
+      width: 90,
+      render: (_, row) =>
+        row.deletedAt ? <Tag color="red">已删除</Tag> : <Tag color="green">正常</Tag>,
+    },
+    {
+      title: "更新时间",
+      dataIndex: "serverUpdatedAt",
+      width: 180,
+      className: "table-date",
+      render: (value: string) => formatDateTime(value),
+    },
+  ];
+  const auditColumns: ColumnsType<AdminAuditLog> = [
+    {
+      title: "动作",
+      dataIndex: "action",
+      render: (value: string) => <Tag color="blue">{auditActionLabel(value)}</Tag>,
+    },
+    {
+      title: "操作者",
+      width: 120,
+      render: (_, row) => row.actor.nickname,
+    },
+    {
+      title: "时间",
+      dataIndex: "createdAt",
+      width: 180,
+      className: "table-date",
+      render: (value: string) => formatDateTime(value),
+    },
+  ];
+
+  return (
+    <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+      {detail.deletedSyncItemCount > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          title="该用户存在可恢复的已删除同步数据"
+          description={`当前共有 ${detail.deletedSyncItemCount} 条已删除同步数据，可进入数据恢复页查看并恢复。`}
+          action={
+            <Button size="small" type="link" onClick={onOpenRecovery}>
+              查看恢复
+            </Button>
+          }
+        />
+      )}
+      <div className="detail-stat-grid">
+        <DetailStat
+          icon={<DatabaseOutlined />}
+          label="同步数据"
+          value={formatCount(detail.syncItemCount)}
+        />
+        <DetailStat
+          icon={<RollbackOutlined />}
+          label="已删除"
+          value={formatCount(detail.deletedSyncItemCount)}
+        />
+        <DetailStat
+          icon={<MobileOutlined />}
+          label="设备"
+          value={formatCount(detail.devices.length)}
+        />
+        <DetailStat
+          icon={<PictureOutlined />}
+          label="媒体"
+          value={formatCount(detail.mediaAssetCount)}
+        />
+      </div>
+      <Tabs
+        items={[
+          {
+            key: "overview",
+            label: "概览",
+            children: (
+              <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                <Descriptions column={2} bordered size="middle">
+                  <Descriptions.Item label="昵称">
+                    {detail.nickname}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="账号">
+                    {detail.username}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="角色">
+                    {roleLabel(detail.role)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="状态">
+                    {statusLabel(detail.status)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="最近同步">
+                    {formatDateTime(detail.latestSyncAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="最近媒体">
+                    {formatDateTime(detail.latestMediaUploadedAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="创建时间">
+                    {formatDateTime(detail.createdAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="更新时间">
+                    {formatDateTime(detail.updatedAt)}
+                  </Descriptions.Item>
+                </Descriptions>
+                <div className="relation-section">
+                  <div className="relation-section-title">
+                    <HistoryOutlined /> 数据类型分布
+                  </div>
+                  {detail.syncTypeStats.length === 0 ? (
+                    <Empty description="暂无同步数据类型" />
+                  ) : (
+                    <div className="type-stat-grid">
+                      {detail.syncTypeStats.map((item) => (
+                        <div className="type-stat-item" key={item.type}>
+                          <strong>{typeLabel(item.type)}</strong>
+                          <span>
+                            正常 {formatCount(item.activeCount)} · 删除{" "}
+                            {formatCount(item.deletedCount)}
+                          </span>
+                          <em>{formatDateTime(item.latestServerUpdatedAt)}</em>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Space wrap>
+                  <Button type="primary" ghost onClick={onOpenData}>
+                    查看全部关联数据
+                  </Button>
+                  <Button onClick={onOpenRecovery}>查看可恢复数据</Button>
+                </Space>
+              </Space>
+            ),
+          },
+          {
+            key: "devices",
+            label: `设备 ${detail.devices.length}`,
+            children: (
+              <Table
+                className="admin-table"
+                rowKey="id"
+                columns={deviceColumns}
+                dataSource={detail.devices}
+                tableLayout="fixed"
+                pagination={false}
+                locale={{ emptyText: <Empty description="暂无设备记录" /> }}
+              />
+            ),
+          },
+          {
+            key: "items",
+            label: "最近数据",
+            children: (
+              <Table
+                className="admin-table"
+                rowKey="id"
+                columns={itemColumns}
+                dataSource={detail.latestItems}
+                tableLayout="fixed"
+                pagination={false}
+                locale={{ emptyText: <Empty description="暂无最近同步数据" /> }}
+              />
+            ),
+          },
+          {
+            key: "deleted",
+            label: `已删除 ${detail.recentDeletedItems.length}`,
+            children: (
+              <Table
+                className="admin-table"
+                rowKey="id"
+                columns={itemColumns}
+                dataSource={detail.recentDeletedItems}
+                tableLayout="fixed"
+                pagination={false}
+                locale={{ emptyText: <Empty description="暂无已删除同步数据" /> }}
+              />
+            ),
+          },
+          {
+            key: "audit",
+            label: "审计",
+            children: (
+              <Table
+                className="admin-table"
+                rowKey="id"
+                columns={auditColumns}
+                dataSource={detail.recentAuditLogs}
+                tableLayout="fixed"
+                pagination={false}
+                locale={{ emptyText: <Empty description="暂无关联审计记录" /> }}
+              />
+            ),
+          },
+        ]}
+      />
+    </Space>
+  );
+}
+
+function DetailStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <div className="detail-stat">
+      <span>{icon}</span>
+      <div>
+        <strong>{value}</strong>
+        <em>{label}</em>
+      </div>
+    </div>
+  );
+}
+
+function SyncItemSummaryCell({
+  item,
+}: {
+  item: AdminSyncItem;
+}): React.JSX.Element {
+  const summary = buildSyncItemSummary(item);
+  return (
+    <div className="sync-business-cell">
+      <div className="sync-business-title">{summary.title}</div>
+      <div className="sync-business-desc">{summary.description}</div>
+      {summary.meta.length > 0 && (
+        <div className="sync-business-meta">
+          {summary.meta.map((value) => (
+            <Tag key={value}>{value}</Tag>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function auditActionLabel(value: string): string {
+  const labels: Record<string, string> = {
+    "admin.users.view": "查看用户",
+    "admin.users.create": "创建用户",
+    "admin.users.update_status": "更新状态",
+    "admin.users.reset_password": "重置密码",
+    "admin.users.delete": "删除用户",
+    "admin.items.view": "查看数据",
+    "admin.items.delete": "删除数据",
+    "admin.items.restore": "恢复数据",
+  };
+  return labels[value] ?? value;
 }
