@@ -7,9 +7,16 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import type { AppConfig } from "./config/configuration";
 
+interface ExpressLikeApp {
+  set(setting: string, value: unknown): void;
+}
+
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService<AppConfig, true>);
+  const expressApp = app.getHttpAdapter().getInstance() as ExpressLikeApp;
+
+  expressApp.set("trust proxy", true);
 
   app.setGlobalPrefix("api/v1", {
     exclude: ["health"],

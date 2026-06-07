@@ -8,6 +8,7 @@ import type { Request } from "express";
 
 import type { AuthUser } from "../auth/auth-user";
 import { PrismaService } from "../common/prisma/prisma.service";
+import { getClientIp, getUserAgent } from "../common/request-context";
 import type { AckPushDto } from "./dto/ack-push.dto";
 import type { CreatePushDto, UpdatePushDto } from "./dto/create-push.dto";
 import type {
@@ -375,8 +376,8 @@ export class MonitorService {
         action: input.action,
         targetType: input.targetType ?? "force_push",
         targetId: input.targetId,
-        ip: request.ip,
-        userAgent: request.headers["user-agent"],
+        ip: getClientIp(request),
+        userAgent: getUserAgent(request),
         metadataJson: input.metadata ? JSON.stringify(input.metadata) : null,
       },
     });

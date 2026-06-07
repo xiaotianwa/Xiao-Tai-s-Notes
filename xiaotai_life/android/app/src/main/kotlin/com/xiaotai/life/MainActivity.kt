@@ -31,6 +31,7 @@ import java.util.Locale
 class MainActivity : FlutterActivity() {
     private val mediaPickerChannel = "xiaotai_life/media_picker"
     private val appInstallerChannel = "xiaotai_life/app_installer"
+    private val deviceInfoChannel = "xiaotai_life/device_info"
     private val monitorChannel = "xiaotai_life/monitor"
     private val speechChannel = "xiaotai_life/speech"
     private val pickImagesRequestCode = 4317
@@ -78,6 +79,15 @@ class MainActivity : FlutterActivity() {
                     openInstallPermissionSettings()
                     result.success(null)
                 }
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            deviceInfoChannel
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "deviceName" -> result.success(androidDeviceName())
                 else -> result.notImplemented()
             }
         }
@@ -428,6 +438,20 @@ class MainActivity : FlutterActivity() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         startActivity(intent)
+    }
+
+    private fun androidDeviceName(): String {
+        val manufacturer = Build.MANUFACTURER.orEmpty().trim()
+        val model = Build.MODEL.orEmpty().trim()
+        if (manufacturer.isEmpty()) return model.ifEmpty { "Android 设备" }
+        if (model.isEmpty()) return manufacturer
+        return if (model.lowercase(Locale.getDefault())
+                .contains(manufacturer.lowercase(Locale.getDefault()))
+        ) {
+            model
+        } else {
+            "$manufacturer $model"
+        }
     }
 
     private fun handlePickImages(rawMax: Int, result: MethodChannel.Result) {

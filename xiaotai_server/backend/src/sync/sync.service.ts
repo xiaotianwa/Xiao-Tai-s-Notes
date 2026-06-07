@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, SyncItem } from '@prisma/client';
 
 import type { AuthUser } from '../auth/auth-user';
+import { normalizeDeviceName } from '../common/device-name';
 import { PrismaService } from '../common/prisma/prisma.service';
 import type {
   BatchUploadSyncItemsDto,
@@ -199,21 +200,27 @@ export class SyncService {
     input: BatchUploadSyncItemsDto,
   ): Promise<void> {
     const device = input.device;
+    const platform = device?.platform ?? 'unknown';
+    const deviceName = normalizeDeviceName(
+      device?.deviceName,
+      platform,
+      input.deviceId,
+    );
     await this.prisma.device.upsert({
       where: { id: input.deviceId },
       create: {
         id: input.deviceId,
         userId: user.id,
-        deviceName: device?.deviceName ?? '未知设备',
-        platform: device?.platform ?? 'unknown',
+        deviceName,
+        platform,
         appVersionName: device?.appVersionName,
         appVersionCode: device?.appVersionCode,
         lastSeenAt: new Date(),
       },
       update: {
         userId: user.id,
-        deviceName: device?.deviceName ?? '未知设备',
-        platform: device?.platform ?? 'unknown',
+        deviceName,
+        platform,
         appVersionName: device?.appVersionName,
         appVersionCode: device?.appVersionCode,
         lastSeenAt: new Date(),

@@ -18,6 +18,7 @@ import sharp from "sharp";
 
 import type { AuthUser } from "../auth/auth-user";
 import { ObjectStorageService } from "../common/object-storage/object-storage.service";
+import { getClientIp, getUserAgent } from "../common/request-context";
 import { resolveStoragePath } from "../common/storage-path";
 import type { AppConfig } from "../config/configuration";
 import { PrismaService } from "../common/prisma/prisma.service";
@@ -460,8 +461,8 @@ export class MediaService {
         action: input.action,
         targetType: "media_asset",
         targetId: input.targetId,
-        ip: request.ip,
-        userAgent: request.headers["user-agent"],
+        ip: getClientIp(request),
+        userAgent: getUserAgent(request),
         metadataJson: input.metadata ? JSON.stringify(input.metadata) : null,
       },
     });

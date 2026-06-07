@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import '../data/app_data_store.dart';
+import '../device/app_device_identity.dart';
 import '../network/app_api_config.dart';
 import 'device_monitor_channel.dart';
 
@@ -71,9 +72,7 @@ class DeviceMonitorService {
     if (deviceId.isEmpty) {
       return '设备标识不可用，请稍后重试';
     }
-    final deviceName = (session?.username.trim().isNotEmpty ?? false)
-        ? session!.username.trim()
-        : Platform.localHostname;
+    final deviceName = await AppDeviceIdentity.deviceName();
 
     final ok = await _channel.start(
       baseUrl: _baseUrl,

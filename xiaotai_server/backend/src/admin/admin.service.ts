@@ -9,8 +9,10 @@ import * as bcrypt from "bcryptjs";
 import type { Request } from "express";
 
 import type { AuthUser } from "../auth/auth-user";
+import { normalizeDeviceName } from "../common/device-name";
 import { ObjectStorageService } from "../common/object-storage/object-storage.service";
 import { PrismaService } from "../common/prisma/prisma.service";
+import { getClientIp, getUserAgent } from "../common/request-context";
 import type {
   AdminAuditLogsQueryDto,
   AdminItemsQueryDto,
@@ -243,7 +245,11 @@ export class AdminService {
       todaySyncCount,
       latestDevices: latestDevices.map((device) => ({
         id: device.id,
-        deviceName: device.deviceName,
+        deviceName: normalizeDeviceName(
+          device.deviceName,
+          device.platform,
+          device.id,
+        ),
         platform: device.platform,
         lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
         user: this.toPublicUser(device.user),
@@ -561,8 +567,8 @@ export class AdminService {
           action: "admin.users.delete",
           targetType: "user",
           targetId: id,
-          ip: request.ip,
-          userAgent: request.headers["user-agent"],
+          ip: getClientIp(request),
+          userAgent: getUserAgent(request),
           metadataJson: JSON.stringify({
             username: user.username,
             nickname: user.nickname,
@@ -687,6 +693,11 @@ export class AdminService {
       ...this.toPublicUser(user),
       devices: user.devices.map((device) => ({
         ...device,
+        deviceName: normalizeDeviceName(
+          device.deviceName,
+          device.platform,
+          device.id,
+        ),
         lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
         createdAt: device.createdAt.toISOString(),
       })),
@@ -928,8 +939,8 @@ export class AdminService {
         action: input.action,
         targetType: input.targetType,
         targetId: input.targetId,
-        ip: request.ip,
-        userAgent: request.headers["user-agent"],
+        ip: getClientIp(request),
+        userAgent: getUserAgent(request),
         metadataJson: input.metadata ? JSON.stringify(input.metadata) : null,
       },
     });
@@ -1138,7 +1149,11 @@ export class AdminService {
       latestDevice: latestDevice
         ? {
             id: latestDevice.id,
-            deviceName: latestDevice.deviceName,
+            deviceName: normalizeDeviceName(
+              latestDevice.deviceName,
+              latestDevice.platform,
+              latestDevice.id,
+            ),
             platform: latestDevice.platform,
             appVersionName: latestDevice.appVersionName,
             appVersionCode: latestDevice.appVersionCode,

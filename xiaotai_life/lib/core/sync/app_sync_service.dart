@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../device/app_device_identity.dart';
 import '../data/app_data_store.dart';
 import '../network/app_api_config.dart';
 
@@ -70,6 +71,7 @@ class AppSyncService {
     required String accessToken,
     required List<AppSyncQueueItem> batch,
   }) async {
+    final deviceName = await AppDeviceIdentity.deviceName();
     final data = await _requestJson(
       accessToken: accessToken,
       method: 'POST',
@@ -77,7 +79,7 @@ class AppSyncService {
       body: {
         'deviceId': store.getSyncDeviceId(),
         'device': {
-          'deviceName': Platform.localHostname,
+          'deviceName': deviceName,
           'platform': Platform.operatingSystem,
         },
         'items': batch
