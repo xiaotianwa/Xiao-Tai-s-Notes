@@ -51,6 +51,8 @@ export function typeLabel(type: string): string {
     weekly_goal: "本周目标",
     anniversary: "纪念日",
     place: "想去的地方",
+    couple_task: "情侣事项",
+    money_record: "记账",
     ai_message: "AI 对话",
     ai_memory: "AI 记忆",
     settings: "设置",

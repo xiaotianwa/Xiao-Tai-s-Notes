@@ -23,6 +23,7 @@ class AppSyncService {
   AppSyncService(this.store, {String? baseUrl})
     : _baseUrl = (baseUrl ?? defaultBaseUrl).replaceFirst(RegExp(r'/$'), '');
 
+  static const _maxPushBatchSize = 100;
   static const defaultBaseUrl = String.fromEnvironment(
     'XIAOTAI_API_BASE_URL',
     defaultValue: AppApiConfig.localDevBaseUrl,
@@ -49,6 +50,22 @@ class AppSyncService {
       return (pushed: 0, conflicts: const <AppSyncConflict>[]);
     }
 
+    var pushed = 0;
+    final conflicts = <AppSyncConflict>[];
+    for (var start = 0; start < queue.length; start += _maxPushBatchSize) {
+      final batch = queue.skip(start).take(_maxPushBatchSize).toList();
+      final result = await _pushBatch(accessToken: accessToken, batch: batch);
+      pushed += result.pushed;
+      conflicts.addAll(result.conflicts);
+    }
+
+    return (pushed: pushed, conflicts: conflicts);
+  }
+
+  Future<({int pushed, List<AppSyncConflict> conflicts})> _pushBatch({
+    required String accessToken,
+    required List<AppSyncQueueItem> batch,
+  }) async {
     final data = await _requestJson(
       accessToken: accessToken,
       method: 'POST',
@@ -59,7 +76,7 @@ class AppSyncService {
           'deviceName': Platform.localHostname,
           'platform': Platform.operatingSystem,
         },
-        'items': queue
+        'items': batch
             .map(
               (item) => {
                 'type': item.type,
@@ -76,7 +93,7 @@ class AppSyncService {
     final rawConflicts = (data['conflicts'] as List<dynamic>? ?? const [])
         .cast<Map<dynamic, dynamic>>();
     final queueByKey = {
-      for (final item in queue) '${item.type}:${item.clientId}': item,
+      for (final item in batch) '${item.type}:${item.clientId}': item,
     };
     final conflicts = rawConflicts.map((item) {
       final key =
@@ -84,7 +101,7 @@ class AppSyncService {
       return AppSyncConflict.fromServerJson(item, localItem: queueByKey[key]);
     }).toList();
     final conflictKeys = conflicts.map((item) => item.key).toSet();
-    final acceptedIds = queue
+    final acceptedIds = batch
         .where(
           (item) => !conflictKeys.contains('${item.type}:${item.clientId}'),
         )

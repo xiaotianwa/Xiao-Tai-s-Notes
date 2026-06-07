@@ -37,6 +37,7 @@ class AppLocalStore {
   static const _cleanSeedDataKey = 'clean_seed_data.v2';
   static const _seenAnnouncementIdsKey = 'seen_announcement_ids.v1';
   static const _seenDailyComicIdsKey = 'seen_daily_comic_ids.v1';
+  static const _maxAiMessages = 80;
 
   static Map<String, Object?>? _webData;
   static final Map<String, Map<String, Object?>> _webBackups = {};
@@ -58,6 +59,15 @@ class AppLocalStore {
     );
     final data = await _readDataFile(file);
     final store = AppLocalStore._(file, data);
+    await store.ensureSeedData();
+    return store;
+  }
+
+  @visibleForTesting
+  static Future<AppLocalStore> createInMemoryForTesting({
+    Map<String, Object?>? data,
+  }) async {
+    final store = AppLocalStore._(null, data ?? <String, Object?>{});
     await store.ensureSeedData();
     return store;
   }
@@ -176,7 +186,7 @@ class AppLocalStore {
       await saveMoneyRecords(const []);
     }
     if (!_data.containsKey(_settingsKey)) {
-      await saveSettings(AppSettings.defaults);
+      await _writeSettings(AppSettings.defaults);
     }
     if (_data[_cleanSeedDataKey] != true) {
       await _removeLegacySeedData();
@@ -194,14 +204,18 @@ class AppLocalStore {
   }
 
   Future<void> saveSettings(AppSettings settings) async {
-    _data[_settingsKey] = settings.toJson();
-    await _writeData();
+    await _writeSettings(settings);
     await enqueueSyncItem(
       type: 'settings',
       clientId: 'settings',
       data: settings.toJson(),
       clientUpdatedAt: settings.updatedAt ?? DateTime.now(),
     );
+  }
+
+  Future<void> _writeSettings(AppSettings settings) async {
+    _data[_settingsKey] = settings.toJson();
+    await _writeData();
   }
 
   AppAuthSession? getAuthSession() {
@@ -396,8 +410,7 @@ class AppLocalStore {
 
   Future<void> addAiMessage(AppAiMessage message) async {
     final messages = [...getAiMessages(), message];
-    final start = messages.length > 80 ? messages.length - 80 : 0;
-    await saveAiMessages(messages.skip(start).toList());
+    await saveAiMessages(_latestAiMessages(messages));
     await enqueueSyncItem(
       type: 'ai_message',
       clientId: message.id,
@@ -406,8 +419,22 @@ class AppLocalStore {
     );
   }
 
-  Future<void> clearAiMessages() {
-    return saveAiMessages(const []);
+  Future<void> clearAiMessages() async {
+    final messages = getAiMessages();
+    if (messages.isEmpty) {
+      return;
+    }
+    final now = DateTime.now();
+    await saveAiMessages(const []);
+    for (final message in messages) {
+      await enqueueSyncItem(
+        type: 'ai_message',
+        clientId: message.id,
+        data: const {},
+        clientUpdatedAt: now,
+        deletedAt: now,
+      );
+    }
   }
 
   List<AppReminder> getReminders() {
@@ -1140,6 +1167,10 @@ class AppLocalStore {
         await saveMemos(
           getMemos().where((memo) => memo.id != clientId).toList(),
         );
+      case 'ai_message':
+        await saveAiMessages(
+          getAiMessages().where((message) => message.id != clientId).toList(),
+        );
       case 'reminder':
         await saveReminders(
           getReminders().where((reminder) => reminder.id != clientId).toList(),
@@ -1194,6 +1225,16 @@ class AppLocalStore {
           items[index] = item;
         }
         await saveMemos(items);
+      case 'ai_message':
+        final item = AppAiMessage.fromJson(data);
+        final items = getAiMessages();
+        final index = items.indexWhere((message) => message.id == item.id);
+        if (index == -1) {
+          items.add(item);
+        } else {
+          items[index] = item;
+        }
+        await saveAiMessages(_latestAiMessages(items));
       case 'reminder':
         final item = AppReminder.fromJson(data);
         final items = getReminders();
@@ -1257,14 +1298,23 @@ class AppLocalStore {
         }
         await saveMoneyRecords(items);
       case 'settings':
-        _data[_settingsKey] = AppSettings.fromJson(data).toJson();
-        await _writeData();
+        await _writeSettings(AppSettings.fromJson(data));
     }
+  }
+
+  List<AppAiMessage> _latestAiMessages(List<AppAiMessage> messages) {
+    final sorted = [...messages]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final start = sorted.length > _maxAiMessages
+        ? sorted.length - _maxAiMessages
+        : 0;
+    return sorted.skip(start).toList();
   }
 
   int _countStoredItems() {
     return getEntries().length +
         getMemos().length +
+        getAiMessages().length +
         getReminders().length +
         getAnniversaries().length +
         getPlaces().length +

@@ -32,13 +32,25 @@ const typeOptions = [
   'entry',
   'memo',
   'reminder',
-  'weekly_goal',
   'anniversary',
   'place',
+  'couple_task',
+  'weekly_goal',
+  'money_record',
   'ai_message',
-  'ai_memory',
   'settings',
 ].map((value) => ({ value, label: typeLabel(value) }));
+
+const deletedOptions = [
+  { value: 'false', label: '正常数据' },
+  { value: 'true', label: '已删除数据' },
+];
+
+interface BusinessSummary {
+  title: string;
+  description: string;
+  meta: string[];
+}
 
 export default function DataPage(): React.JSX.Element {
   const [items, setItems] = useState<AdminSyncItem[]>([]);
@@ -47,6 +59,7 @@ export default function DataPage(): React.JSX.Element {
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState('');
   const [type, setType] = useState<string | undefined>();
+  const [deleted, setDeleted] = useState<string | undefined>('false');
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +74,7 @@ export default function DataPage(): React.JSX.Element {
         pageSize: nextPageSize,
         keyword,
         type,
+        deleted,
       });
       setItems(result.items);
       setTotal(result.total);
@@ -109,23 +123,43 @@ export default function DataPage(): React.JSX.Element {
   }, []);
 
   const columns: ColumnsType<AdminSyncItem> = [
-    { title: '用户', dataIndex: 'nickname', width: 140 },
+    { title: '用户', dataIndex: 'nickname', width: 120 },
     {
       title: '类型',
       dataIndex: 'type',
-      width: 130,
+      width: 120,
       render: (value: string) => <Tag color="blue">{typeLabel(value)}</Tag>,
+    },
+    {
+      title: '业务内容',
+      dataIndex: 'data',
+      render: (_, row) => {
+        const summary = buildBusinessSummary(row);
+        return (
+          <div className="sync-business-cell">
+            <div className="sync-business-title">{summary.title}</div>
+            <div className="sync-business-desc">{summary.description}</div>
+            {summary.meta.length > 0 && (
+              <div className="sync-business-meta">
+                {summary.meta.map((item) => (
+                  <Tag key={item}>{item}</Tag>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: '客户端 ID',
       dataIndex: 'clientId',
-      width: 280,
+      width: 210,
       ellipsis: true,
       render: (value: string) => (
         <span className="table-mono-text table-clip">{value}</span>
       ),
     },
-    { title: '版本', dataIndex: 'version', width: 80 },
+    { title: '版本', dataIndex: 'version', width: 70 },
     {
       title: '删除',
       dataIndex: 'deletedAt',
@@ -136,7 +170,7 @@ export default function DataPage(): React.JSX.Element {
     {
       title: '服务端更新时间',
       dataIndex: 'serverUpdatedAt',
-      width: 180,
+      width: 170,
       className: "table-date",
       render: (value: string) => formatDateTime(value),
     },
@@ -208,6 +242,14 @@ export default function DataPage(): React.JSX.Element {
             options={typeOptions}
             onChange={(value) => setType(value)}
           />
+          <Select
+            allowClear
+            placeholder="删除状态"
+            style={{ width: 160 }}
+            value={deleted}
+            options={deletedOptions}
+            onChange={(value) => setDeleted(value)}
+          />
           <Button type="primary" ghost onClick={() => void load(1, pageSize)}>
             筛选
           </Button>
@@ -258,6 +300,9 @@ export default function DataPage(): React.JSX.Element {
               <Descriptions.Item label="客户端 ID">
                 {detail.clientId}
               </Descriptions.Item>
+              <Descriptions.Item label="业务摘要">
+                <BusinessSummaryView item={detail} />
+              </Descriptions.Item>
               <Descriptions.Item label="版本">{detail.version}</Descriptions.Item>
               <Descriptions.Item label="删除状态">
                 {detail.deletedAt ? (
@@ -286,4 +331,243 @@ export default function DataPage(): React.JSX.Element {
       </Modal>
     </>
   );
+}
+
+function BusinessSummaryView({
+  item,
+}: {
+  item: AdminSyncItem;
+}): React.JSX.Element {
+  const summary = buildBusinessSummary(item);
+  return (
+    <div className="sync-business-cell sync-business-cell-detail">
+      <div className="sync-business-title">{summary.title}</div>
+      <div className="sync-business-desc">{summary.description}</div>
+      {summary.meta.length > 0 && (
+        <div className="sync-business-meta">
+          {summary.meta.map((value) => (
+            <Tag key={value}>{value}</Tag>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildBusinessSummary(item: AdminSyncItem): BusinessSummary {
+  const data = readRecord(item.data);
+  const deletedPrefix = item.deletedAt ? '已删除 · ' : '';
+  const fallbackTitle = `${deletedPrefix}${typeLabel(item.type)} / ${item.clientId}`;
+  switch (item.type) {
+    case 'entry':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: clipText(firstText(data, ['content'], '暂无正文')),
+        meta: compact([
+          firstText(data, ['kindLabel', 'kind']),
+          firstText(data, ['mood']),
+          readStringList(data, 'tags').join('、'),
+        ]),
+      };
+    case 'memo':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: clipText(firstText(data, ['content'], '暂无内容')),
+        meta: compact([
+          readBoolean(data, 'pinned') ? '置顶' : '',
+          firstText(data, ['mood']),
+          readStringList(data, 'tags').join('、'),
+        ]),
+      };
+    case 'reminder':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: compact([
+          formatDateTime(readString(data, 'scheduledAt')),
+          firstText(data, ['repeatRule']),
+        ]).join(' · '),
+        meta: compact([
+          readBoolean(data, 'completed') ? '已完成' : '待提醒',
+          firstText(data, ['priority']),
+        ]),
+      };
+    case 'anniversary':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: compact([
+          formatDateTime(readString(data, 'date')),
+          firstText(data, ['note'], '暂无备注'),
+        ]).join(' · '),
+        meta: compact([
+          firstText(data, ['category']),
+          readBoolean(data, 'showCountUp') ? '正数日' : '倒数日',
+          readBoolean(data, 'pinnedOnHome') ? '首页显示' : '',
+        ]),
+      };
+    case 'place':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: clipText(firstText(data, ['description'], '暂无描述')),
+        meta: compact([
+          firstText(data, ['category']),
+          firstText(data, ['colorName']),
+        ]),
+      };
+    case 'couple_task':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: compact([
+          readBoolean(data, 'completed') ? '已完成' : '未完成',
+          formatDateTime(readString(data, 'completedAt')),
+        ]).join(' · '),
+        meta: compact([`序号 ${readNumber(data, 'index') ?? '-'}`]),
+      };
+    case 'weekly_goal':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: formatGoalProgress(data),
+        meta: compact([
+          firstText(data, ['period']),
+          firstText(data, ['unit']),
+          firstText(data, ['colorName']),
+        ]),
+      };
+    case 'money_record':
+      return {
+        title: deletedPrefix + firstText(data, ['title'], fallbackTitle),
+        description: compact([
+          readString(data, 'type') === 'income' ? '收入' : '支出',
+          formatAmount(readNumber(data, 'amountCents')),
+          firstText(data, ['category']),
+          formatDateTime(readString(data, 'happenedAt')),
+        ]).join(' · '),
+        meta: compact([
+          firstText(data, ['owner']),
+          firstText(data, ['paymentMethod']),
+        ]),
+      };
+    case 'ai_message':
+      return {
+        title:
+          deletedPrefix +
+          `${roleLabel(readString(data, 'role'))} / ${item.clientId}`,
+        description: clipText(firstText(data, ['content'], '暂无对话内容')),
+        meta: compact([formatDateTime(readString(data, 'createdAt'))]),
+      };
+    case 'settings':
+      return {
+        title: `${deletedPrefix}个人资料与偏好设置`,
+        description: compact([
+          firstText(data, ['profileName']),
+          firstText(data, ['profileMotto']),
+          `主题 ${firstText(data, ['themeId'], '-')}`,
+        ]).join(' · '),
+        meta: compact([
+          readBoolean(data, 'notificationsEnabled') ? '通知开启' : '通知关闭',
+          readBoolean(data, 'lockPreviewEnabled') ? '锁屏预览' : '',
+        ]),
+      };
+    default:
+      return {
+        title: deletedPrefix + firstText(data, ['title', 'name', 'id'], fallbackTitle),
+        description: clipText(JSON.stringify(data)),
+        meta: [],
+      };
+  }
+}
+
+function readRecord(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function firstText(
+  data: Record<string, unknown>,
+  keys: string[],
+  fallback = '',
+): string {
+  for (const key of keys) {
+    const value = readString(data, key);
+    if (value) {
+      return value;
+    }
+  }
+  return fallback;
+}
+
+function readString(data: Record<string, unknown>, key: string): string {
+  const value = data[key];
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}
+
+function readNumber(
+  data: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = data[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function readBoolean(data: Record<string, unknown>, key: string): boolean {
+  return data[key] === true;
+}
+
+function readStringList(
+  data: Record<string, unknown>,
+  key: string,
+): string[] {
+  const value = data[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function compact(values: Array<string | undefined>): string[] {
+  return values
+    .map((value) => value?.trim() ?? '')
+    .filter((value, index, array) => value.length > 0 && array.indexOf(value) === index);
+}
+
+function clipText(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '-';
+  }
+  return normalized.length > 86 ? `${normalized.slice(0, 86)}...` : normalized;
+}
+
+function formatGoalProgress(data: Record<string, unknown>): string {
+  const current = readNumber(data, 'currentValue');
+  const target = readNumber(data, 'targetValue');
+  const unit = readString(data, 'unit');
+  if (current === undefined && target === undefined) {
+    return '暂无进度';
+  }
+  return `${current ?? 0}/${target ?? '-'}${unit}`;
+}
+
+function formatAmount(cents?: number): string {
+  if (cents === undefined) {
+    return '金额未知';
+  }
+  return `${(cents / 100).toFixed(2)} 元`;
+}
+
+function roleLabel(role: string): string {
+  if (role === 'user') {
+    return '用户';
+  }
+  if (role === 'assistant') {
+    return '助手';
+  }
+  return role || 'AI 对话';
 }

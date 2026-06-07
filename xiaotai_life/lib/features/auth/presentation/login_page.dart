@@ -4,6 +4,7 @@ import '../../../core/auth/app_auth_notifier.dart';
 import '../../../core/auth/app_auth_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/data/app_data_store.dart';
+import '../../../core/notifications/local_notification_service.dart';
 import '../../../core/sync/app_sync_service.dart';
 import '../../../core/theme/app_theme_tokens.dart';
 import '../../../shared/widgets/prototype_ui.dart';
@@ -229,23 +230,36 @@ class _LoginPageState extends State<LoginPage> {
         password: password,
       );
       await store.saveAuthSession(session);
+      var syncMessage = '登录成功，云端记录已确认最新';
       try {
         await store.markSyncStarted();
         final result = await AppSyncService(
           store,
         ).sync(accessToken: session.accessToken);
+        await LocalNotificationService.instance.syncPinnedReminders(
+          store.getReminders(),
+        );
+        await LocalNotificationService.instance.syncMemoReminders(
+          store.getMemos(),
+        );
         await store.markSyncSucceeded(
           pushed: result.pushed,
           pulled: result.pulled,
           conflicts: result.conflicts,
         );
+        if (result.conflictCount > 0) {
+          syncMessage = '登录成功，已自动同步，有 ${result.conflictCount} 条冲突待处理';
+        } else if (result.pushed + result.pulled > 0) {
+          syncMessage = '登录成功，已自动同步 ${result.pushed + result.pulled} 条记录';
+        }
       } catch (syncError) {
         await store.markSyncFailed(syncError);
+        syncMessage = '登录成功，但自动同步失败：${_cleanError(syncError)}';
       }
       if (!mounted) {
         return;
       }
-      _showSnack('登录成功，已记住本机登录状态');
+      _showSnack(syncMessage);
       // 通知路由 redirect 重新计算，会自动从 /login 跳到 /today，无需手动 pop。
       AppAuthNotifier.instance.setSession(session);
     } catch (error) {
@@ -268,5 +282,9 @@ class _LoginPageState extends State<LoginPage> {
           content: Text(message, textAlign: TextAlign.center),
         ),
       );
+  }
+
+  String _cleanError(Object error) {
+    return error.toString().replaceFirst('Bad state: ', '');
   }
 }

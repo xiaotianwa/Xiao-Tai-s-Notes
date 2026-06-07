@@ -77,6 +77,16 @@ void main() {
     expect(decoded.lastConflicts.single.serverData['content'], '云端备忘');
   });
 
+  test(
+    'new local store does not enqueue default settings before login',
+    () async {
+      final store = await AppLocalStore.create();
+
+      expect(store.getSettings().profileName, AppSettings.defaults.profileName);
+      expect(store.getSyncQueue(), isEmpty);
+    },
+  );
+
   test('keepLocalConflict refreshes queued item and clears conflict', () async {
     final store = await AppLocalStore.create();
     await store.saveSyncQueue(const []);
@@ -176,5 +186,96 @@ void main() {
     );
 
     expect(store.getCoupleTasks(), isEmpty);
+  });
+
+  test('remote anniversary items are applied to local store', () async {
+    final store = await AppLocalStore.create();
+
+    await store.applyRemoteSyncItem(
+      type: 'anniversary',
+      clientId: 'anniversary_remote_love',
+      data: {
+        'id': 'anniversary_remote_love',
+        'title': '第一次旅行',
+        'date': '2024-10-01T00:00:00.000',
+        'category': 'love',
+        'colorName': 'pink',
+        'mascotVariant': 'heart',
+        'imagePath': null,
+        'note': '云端同步回来的纪念日',
+        'showCountUp': true,
+        'pinnedOnHome': true,
+      },
+    );
+
+    final anniversary = store.getAnniversaries().single;
+    expect(anniversary.id, 'anniversary_remote_love');
+    expect(anniversary.title, '第一次旅行');
+    expect(anniversary.showCountUp, isTrue);
+    expect(anniversary.pinnedOnHome, isTrue);
+
+    await store.applyRemoteSyncItem(
+      type: 'anniversary',
+      clientId: anniversary.id,
+      data: const {},
+      deletedAt: DateTime(2026, 6, 5),
+    );
+
+    expect(store.getAnniversaries(), isEmpty);
+  });
+
+  test('remote ai messages are applied and deleted from local store', () async {
+    final store = await AppLocalStore.create();
+
+    await store.applyRemoteSyncItem(
+      type: 'ai_message',
+      clientId: 'ai_remote_1',
+      data: {
+        'id': 'ai_remote_1',
+        'role': 'assistant',
+        'content': '我会记得这条对话',
+        'createdAt': '2026-06-03T20:30:00.000',
+      },
+    );
+
+    final message = store.getAiMessages().single;
+    expect(message.id, 'ai_remote_1');
+    expect(message.content, '我会记得这条对话');
+
+    await store.applyRemoteSyncItem(
+      type: 'ai_message',
+      clientId: message.id,
+      data: const {},
+      deletedAt: DateTime(2026, 6, 5),
+    );
+
+    expect(store.getAiMessages(), isEmpty);
+  });
+
+  test('clear ai messages queues remote deletes', () async {
+    final store = await AppLocalStore.create();
+    await store.saveSyncQueue(const []);
+    await store.saveAiMessages([
+      AppAiMessage(
+        id: 'ai_message_1',
+        role: 'user',
+        content: '第一条',
+        createdAt: DateTime(2026, 6, 3, 20),
+      ),
+      AppAiMessage(
+        id: 'ai_message_2',
+        role: 'assistant',
+        content: '第二条',
+        createdAt: DateTime(2026, 6, 3, 20, 1),
+      ),
+    ]);
+
+    await store.clearAiMessages();
+
+    expect(store.getAiMessages(), isEmpty);
+    final queue = store.getSyncQueue();
+    expect(queue, hasLength(2));
+    expect(queue.map((item) => item.type).toSet(), {'ai_message'});
+    expect(queue.every((item) => item.deletedAt != null), isTrue);
   });
 }

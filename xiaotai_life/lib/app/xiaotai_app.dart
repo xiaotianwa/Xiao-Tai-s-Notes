@@ -225,6 +225,12 @@ class _XiaotaiAppState extends State<XiaotaiApp> with WidgetsBindingObserver {
         store,
       ).sync(accessToken: refreshed.accessToken);
       AppThemeController.instance.applySettings(store.getSettings());
+      await LocalNotificationService.instance.syncPinnedReminders(
+        store.getReminders(),
+      );
+      await LocalNotificationService.instance.syncMemoReminders(
+        store.getMemos(),
+      );
       await store.markSyncSucceeded(
         pushed: result.pushed,
         pulled: result.pulled,
