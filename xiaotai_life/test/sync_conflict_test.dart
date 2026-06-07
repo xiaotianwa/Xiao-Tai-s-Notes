@@ -224,6 +224,44 @@ void main() {
     expect(store.getAnniversaries(), isEmpty);
   });
 
+  test(
+    'local sync snapshot queues existing anniversaries once per user',
+    () async {
+      final store = await AppLocalStore.createInMemoryForTesting();
+      await store.saveSyncQueue(const []);
+      await store.saveAnniversaries([
+        AppAnniversary(
+          id: 'anniversary_local_love',
+          title: '在一起',
+          date: DateTime(2024, 5, 20),
+          category: 'love',
+          colorName: 'pink',
+          mascotVariant: 'heart',
+          note: '本机已有的纪念日',
+          showCountUp: true,
+          pinnedOnHome: true,
+        ),
+      ]);
+
+      final queued = await store.enqueueLocalSyncSnapshot(userId: 'user_1');
+
+      expect(queued, 1);
+      final queue = store.getSyncQueue();
+      expect(queue, hasLength(1));
+      expect(queue.single.type, 'anniversary');
+      expect(queue.single.clientId, 'anniversary_local_love');
+      expect(queue.single.clientUpdatedAt, DateTime(2024, 5, 20));
+      expect(queue.single.data['title'], '在一起');
+
+      final queuedAgain = await store.enqueueLocalSyncSnapshot(
+        userId: 'user_1',
+      );
+
+      expect(queuedAgain, 0);
+      expect(store.getSyncQueue(), hasLength(1));
+    },
+  );
+
   test('remote ai messages are applied and deleted from local store', () async {
     final store = await AppLocalStore.create();
 

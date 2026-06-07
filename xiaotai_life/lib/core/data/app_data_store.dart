@@ -33,6 +33,8 @@ class AppLocalStore {
   static const _syncDeviceIdKey = 'sync_device_id.v1';
   static const _syncLastPulledAtKey = 'sync_last_pulled_at.v1';
   static const _syncStatusKey = 'sync_status.v1';
+  static const _syncSnapshotBackfilledUserIdsKey =
+      'sync_snapshot_backfilled_user_ids.v1';
   static const _dataRecoveryNoticeKey = 'data_recovery_notice.v1';
   static const _cleanSeedDataKey = 'clean_seed_data.v2';
   static const _seenAnnouncementIdsKey = 'seen_announcement_ids.v1';
@@ -810,6 +812,134 @@ class AppLocalStore {
     );
   }
 
+  Future<int> enqueueLocalSyncSnapshot({
+    required String userId,
+    bool force = false,
+  }) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      return 0;
+    }
+
+    final backfilledUserIds = _readStringSet(_syncSnapshotBackfilledUserIdsKey);
+    if (!force && backfilledUserIds.contains(normalizedUserId)) {
+      return 0;
+    }
+
+    final fallbackUpdatedAt = DateTime.fromMillisecondsSinceEpoch(
+      0,
+      isUtc: true,
+    );
+    var queued = 0;
+
+    Future<void> enqueue({
+      required String type,
+      required String clientId,
+      required Map<String, Object?> data,
+      required DateTime clientUpdatedAt,
+    }) async {
+      await enqueueSyncItem(
+        type: type,
+        clientId: clientId,
+        data: data,
+        clientUpdatedAt: clientUpdatedAt,
+      );
+      queued += 1;
+    }
+
+    for (final entry in getEntries()) {
+      await enqueue(
+        type: 'entry',
+        clientId: entry.id,
+        data: entry.toJson(),
+        clientUpdatedAt: entry.createdAt,
+      );
+    }
+    for (final memo in getMemos()) {
+      await enqueue(
+        type: 'memo',
+        clientId: memo.id,
+        data: memo.toJson(),
+        clientUpdatedAt: memo.updatedAt,
+      );
+    }
+    for (final message in getAiMessages()) {
+      await enqueue(
+        type: 'ai_message',
+        clientId: message.id,
+        data: message.toJson(),
+        clientUpdatedAt: message.createdAt,
+      );
+    }
+    for (final reminder in getReminders()) {
+      await enqueue(
+        type: 'reminder',
+        clientId: reminder.id,
+        data: reminder.toJson(),
+        clientUpdatedAt: reminder.scheduledAt,
+      );
+    }
+    for (final anniversary in getAnniversaries()) {
+      await enqueue(
+        type: 'anniversary',
+        clientId: anniversary.id,
+        data: anniversary.toJson(),
+        clientUpdatedAt: anniversary.date,
+      );
+    }
+    for (final place in getPlaces()) {
+      await enqueue(
+        type: 'place',
+        clientId: place.id,
+        data: place.toJson(),
+        clientUpdatedAt: fallbackUpdatedAt,
+      );
+    }
+    for (final task in getCoupleTasks()) {
+      await enqueue(
+        type: 'couple_task',
+        clientId: task.id,
+        data: task.toJson(),
+        clientUpdatedAt: task.completedAt ?? fallbackUpdatedAt,
+      );
+    }
+    for (final goal in getWeeklyGoals()) {
+      await enqueue(
+        type: 'weekly_goal',
+        clientId: goal.id,
+        data: goal.toJson(),
+        clientUpdatedAt: _dateKeyUpdatedAt(
+          goal.lastCheckInDateKey,
+          fallbackUpdatedAt,
+        ),
+      );
+    }
+    for (final record in getMoneyRecords()) {
+      await enqueue(
+        type: 'money_record',
+        clientId: record.id,
+        data: record.toJson(),
+        clientUpdatedAt: record.updatedAt,
+      );
+    }
+
+    final settings = getSettings();
+    if (settings.updatedAt != null) {
+      await enqueue(
+        type: 'settings',
+        clientId: 'settings',
+        data: settings.toJson(),
+        clientUpdatedAt: settings.updatedAt!,
+      );
+    }
+
+    backfilledUserIds.add(normalizedUserId);
+    _data[_syncSnapshotBackfilledUserIdsKey] = backfilledUserIds.toList()
+      ..sort();
+    await _writeData();
+    return queued;
+  }
+
   Future<void> enqueueSyncItem({
     required String type,
     required String clientId,
@@ -1105,6 +1235,14 @@ class AppLocalStore {
         .cast<Map<dynamic, dynamic>>()
         .map((item) => fromJson(item.cast<String, Object?>()))
         .toList();
+  }
+
+  Set<String> _readStringSet(String key) {
+    final decoded = _data[key] as List<dynamic>?;
+    if (decoded == null) {
+      return <String>{};
+    }
+    return decoded.whereType<String>().toSet();
   }
 
   Future<void> _writeList(String key, List<Map<String, Object?>> values) async {
@@ -1413,5 +1551,13 @@ class AppLocalStore {
 
   bool _sameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  DateTime _dateKeyUpdatedAt(String? dateKey, DateTime fallback) {
+    if (dateKey == null || dateKey.isEmpty) {
+      return fallback;
+    }
+    final parsed = DateTime.tryParse(dateKey);
+    return parsed ?? fallback;
   }
 }

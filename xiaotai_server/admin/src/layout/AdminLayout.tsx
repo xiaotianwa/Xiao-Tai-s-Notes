@@ -41,12 +41,6 @@ const navItems = [
     icon: <CustomerServiceOutlined />,
     label: "音乐管理",
   },
-  {
-    section: "运营",
-    key: "/monitor/usage",
-    icon: <DashboardOutlined />,
-    label: "设备监控",
-  },
   { section: "运营", key: "/monitor/push", icon: <ControlOutlined />, label: "强提醒" },
   { section: "运营", key: "/ai-verify", icon: <ApiOutlined />, label: "AI 验证" },
   {

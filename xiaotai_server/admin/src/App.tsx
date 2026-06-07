@@ -17,7 +17,6 @@ const EntriesPage = lazy(() => import("./pages/EntriesPage"));
 const ForcePushPage = lazy(() => import("./pages/ForcePushPage"));
 const MediaPage = lazy(() => import("./pages/MediaPage"));
 const MemosPage = lazy(() => import("./pages/MemosPage"));
-const MonitorUsagePage = lazy(() => import("./pages/MonitorUsagePage"));
 const MusicPage = lazy(() => import("./pages/MusicPage"));
 const PlacesPage = lazy(() => import("./pages/PlacesPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
@@ -58,10 +57,6 @@ export default function App(): React.JSX.Element {
             <Route path="/places" element={withSuspense(<PlacesPage />)} />
             <Route path="/media" element={withSuspense(<MediaPage />)} />
             <Route path="/music" element={withSuspense(<MusicPage />)} />
-            <Route
-              path="/monitor/usage"
-              element={withSuspense(<MonitorUsagePage />)}
-            />
             <Route
               path="/monitor/push"
               element={withSuspense(<ForcePushPage />)}

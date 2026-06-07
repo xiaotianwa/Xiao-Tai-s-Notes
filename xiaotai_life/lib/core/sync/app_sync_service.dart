@@ -33,6 +33,10 @@ class AppSyncService {
   final String _baseUrl;
 
   Future<AppSyncResult> sync({required String accessToken}) async {
+    final session = store.getAuthSession();
+    if (session != null) {
+      await store.enqueueLocalSyncSnapshot(userId: session.userId);
+    }
     final pushResult = await pushPending(accessToken: accessToken);
     final pulled = await pullRemoteChanges(accessToken: accessToken);
     return AppSyncResult(
