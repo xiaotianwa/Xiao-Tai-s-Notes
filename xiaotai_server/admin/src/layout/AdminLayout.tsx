@@ -3,6 +3,7 @@ import {
   ApiOutlined,
   BellOutlined,
   BookOutlined,
+  CalendarOutlined,
   ControlOutlined,
   CustomerServiceOutlined,
   DashboardOutlined,
@@ -28,6 +29,7 @@ const navItems = [
   { section: "账号", key: "/users", icon: <TeamOutlined />, label: "用户管理" },
   { section: "内容", key: "/entries", icon: <EditOutlined />, label: "记录" },
   { section: "内容", key: "/memos", icon: <FileTextOutlined />, label: "备忘录" },
+  { section: "内容", key: "/anniversaries", icon: <CalendarOutlined />, label: "纪念日" },
   {
     section: "内容",
     key: "/places",

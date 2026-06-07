@@ -187,40 +187,6 @@ export interface AdminMusicTrack {
   updatedAt: string;
 }
 
-export interface MonitorTodayUsageItem {
-  packageName: string;
-  appName: string;
-  totalMillis: number;
-}
-
-export interface MonitorUsageReport {
-  id: string;
-  userId: string;
-  username: string;
-  nickname: string;
-  deviceId: string;
-  deviceName: string | null;
-  screenOn: boolean;
-  foregroundPackage: string | null;
-  foregroundAppName: string | null;
-  foregroundSinceMillis: number | null;
-  todayUsage: MonitorTodayUsageItem[];
-  capturedAt: string;
-  createdAt: string;
-}
-
-export interface MonitorDeviceSummary {
-  userId: string;
-  username: string;
-  nickname: string;
-  deviceId: string;
-  deviceName: string | null;
-  lastSeenAt: string;
-  screenOn: boolean;
-  foregroundPackage: string | null;
-  foregroundAppName: string | null;
-}
-
 export interface ForcePush {
   id: string;
   userId: string;

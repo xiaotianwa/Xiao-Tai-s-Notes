@@ -7,6 +7,7 @@ import AdminLayout from "./layout/AdminLayout";
 import LoginPage from "./pages/LoginPage";
 
 const AnnouncementsPage = lazy(() => import("./pages/AnnouncementsPage"));
+const AnniversariesPage = lazy(() => import("./pages/AnniversariesPage"));
 const AuditLogsPage = lazy(() => import("./pages/AuditLogsPage"));
 const AppVersionsPage = lazy(() => import("./pages/AppVersionsPage"));
 const AiVerifyPage = lazy(() => import("./pages/AiVerifyPage"));
@@ -54,6 +55,10 @@ export default function App(): React.JSX.Element {
             <Route path="/data" element={withSuspense(<DataPage />)} />
             <Route path="/entries" element={withSuspense(<EntriesPage />)} />
             <Route path="/memos" element={withSuspense(<MemosPage />)} />
+            <Route
+              path="/anniversaries"
+              element={withSuspense(<AnniversariesPage />)}
+            />
             <Route path="/places" element={withSuspense(<PlacesPage />)} />
             <Route path="/media" element={withSuspense(<MediaPage />)} />
             <Route path="/music" element={withSuspense(<MusicPage />)} />

@@ -14,8 +14,6 @@ import type {
   AuthTokens,
   DashboardData,
   ForcePush,
-  MonitorDeviceSummary,
-  MonitorUsageReport,
   PageResult,
 } from "./types";
 
@@ -226,6 +224,12 @@ export function getItems(query: ItemQuery): Promise<PageResult<AdminSyncItem>> {
   return requestApi<PageResult<AdminSyncItem>>(
     `/admin/items?${toQuery(query)}`,
   );
+}
+
+export function getAnniversaryItems(
+  query: Omit<ItemQuery, "type">,
+): Promise<PageResult<AdminSyncItem>> {
+  return getItems({ ...query, type: "anniversary" });
 }
 
 export function getItemDetail(id: string): Promise<AdminSyncItem> {
@@ -450,34 +454,6 @@ export function getForcePushes(
   query: MonitorPushQuery,
 ): Promise<PageResult<ForcePush>> {
   return requestApi<PageResult<ForcePush>>(`/monitor/push?${toQuery(query)}`);
-}
-
-export function getMonitorDevices(query: {
-  userId?: string;
-}): Promise<MonitorDeviceSummary[]> {
-  return requestApi<MonitorDeviceSummary[]>(
-    `/monitor/devices?${toQuery(query)}`,
-  );
-}
-
-export function getMonitorLatestUsage(query: {
-  userId: string;
-  deviceId: string;
-}): Promise<MonitorUsageReport | null> {
-  return requestApi<MonitorUsageReport | null>(
-    `/monitor/usage/latest?${toQuery(query)}`,
-  );
-}
-
-export function getMonitorUsage(query: {
-  userId: string;
-  deviceId: string;
-  page?: number;
-  pageSize?: number;
-}): Promise<PageResult<MonitorUsageReport>> {
-  return requestApi<PageResult<MonitorUsageReport>>(
-    `/monitor/usage?${toQuery(query)}`,
-  );
 }
 
 export function createForcePush(

@@ -1080,6 +1080,12 @@ img {
   min-width: 760px;
 }
 
+.json-preview-title {
+  margin-bottom: 8px;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
 .json-preview {
   max-height: 460px;
   overflow: auto;
